@@ -1,0 +1,171 @@
+﻿@page "/"
+
+<PageTitle>Index</PageTitle>
+
+@if (this.showAlert)
+{
+    <MudAlert Severity="Severity.Error" ShowCloseIcon="true" CloseIconClicked="this.CloseAlert">@this.response.Message</MudAlert>
+}
+
+@if (this.showSuccess)
+{
+    <MudAlert Severity="Severity.Success" ShowCloseIcon="true" CloseIconClicked="this.CloseSuccess">@this.response.Message</MudAlert>
+}
+
+    <MudGrid>
+        <MudItem md="3"></MudItem>
+        <MudItem md="6">
+            <MudText Typo="Typo.h3" Align="Align.Center" GutterBottom="true">Blazor WASM Todo</MudText>
+            <MudPaper Class="d-flex justify-center flex-grow-1 gap-4" Elevation="0">
+                <EditForm Model="@input" OnValidSubmit="Submit">
+                    <DataAnnotationsValidator/>
+                    <MudGrid>
+                        <MudItem md="6">
+                            <MudCardContent Class="mb-5">
+                                <MudTextField Label="Task" HelperText="Min. 5 characters"
+                                                  @bind-Value="input.Text" For="@(() => input.Text)"/>
+                            </MudCardContent>
+                        </MudItem>
+                        <MudItem md="6">
+                            <MudCardActions>
+                                <MudPaper Class="d-flex align-center flex-grow-1 gap-4" Elevation="0">
+                                   <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Class="mt-5" Color="Color.Default">Submit</MudButton>
+                                </MudPaper>
+                            </MudCardActions>
+                        </MudItem>
+                    </MudGrid>
+                </EditForm>
+            </MudPaper>
+
+             @if (this.todoList != null)
+                {
+                    @foreach (var todo in this.todoList.Todos)
+                    {
+                          <MudPaper Class="d-flex justify-center flex-grow-1 gap-4" Elevation="0">
+                <MudCheckBox OnClick="() => this.UpdateStatus(todo.Id)" @bind-Checked="@todo.IsCompleted" Color="Color.Secondary"></MudCheckBox>
+                        <span class="mt-3">
+                            @if (todo.IsCompleted)
+                            {
+                                <MudText Style="text-decoration: line-through">@todo.Text</MudText>
+                            }
+                            else
+                            {
+                                <MudText>@todo.Text</MudText>
+                            }
+                    </span>
+                        <span>
+                            <MudIconButton OnClick="() => this.Delete(todo.Id)" Icon="@Icons.Material.Filled.Close" aria-label="delete"></MudIconButton>
+                        </span>
+                
+            </MudPaper>
+                    }
+                }
+
+                <MudPaper Class="d-flex justify-center flex-grow-1 gap-4" Elevation="0">
+                    <MudButton OnClick="this.Logout" Color="Color.Secondary" aria-label="delete">Logout</MudButton>
+                </MudPaper>
+
+        </MudItem>
+        <MudItem md="3"></MudItem>
+    </MudGrid>
+
+@code {
+    private CreateTodoInputModel input = new CreateTodoInputModel();
+    private UserViewModel currentUser;
+    private ApiResponseViewModel response;
+    private AllTodosListViewModel todoList;
+
+    private bool showAlert = false;
+    private bool showSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        string email = await this.localStorage.GetItemAsync<string>("email");
+
+        if (email == null)
+        {
+            this.navigationManager.NavigateTo("/login");
+        }
+        else
+        {
+            this.currentUser = await this.usersService.GetCurrentUserAsync(email);
+            this.todoList = await this.todosService.GetAllTodosAsync(this.currentUser.Id);
+        }
+    }
+
+    private async Task Submit()
+    {
+        this.input.UserId = this.currentUser.Id;
+        this.response = await this.todosService.CreateAsync(this.input);
+
+        if (this.response.IsSuccessful)
+        {
+            this.showSuccess = true;
+            this.todoList = await this.todosService.GetAllTodosAsync(this.currentUser.Id);
+        }
+        else
+        {
+            this.showAlert = true;
+        }
+
+        this.StateHasChanged();
+    }
+
+    private async Task UpdateStatus(int id)
+    {
+        this.response = await this.todosService.UpdateStatusAsync(id);
+
+        if (this.response.IsSuccessful)
+        {
+            this.showSuccess = true;
+            this.todoList = await this.todosService.GetAllTodosAsync(this.currentUser.Id);
+        }
+        else
+        {
+            this.showAlert = true;
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        this.response = await this.todosService.DeleteAsync(id);
+
+        if (this.response.IsSuccessful)
+        {
+            this.showSuccess = true;
+            this.todoList = await this.todosService.GetAllTodosAsync(this.currentUser.Id);
+        }
+        else
+        {
+            this.showAlert = true;
+        }
+    }
+
+    private async Task Logout()
+    {
+        await this.localStorage.RemoveItemAsync("email");
+
+        string email = await this.localStorage.GetItemAsync<string>("email");
+
+        if (email == null)
+        {
+            this.navigationManager.NavigateTo("/login");
+        }
+        else
+        {
+            this.currentUser = await this.usersService.GetCurrentUserAsync(email);   
+        }
+
+        this.StateHasChanged();
+    }
+
+    private void CloseAlert()
+    {
+        this.showAlert = false;
+    }
+
+    private void CloseSuccess()
+    {
+        this.showSuccess = false;
+    }
+}
